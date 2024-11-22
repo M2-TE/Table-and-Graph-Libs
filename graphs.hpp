@@ -750,6 +750,109 @@ namespace graphs
 		return 0;
 	}
 
+	// Draw bar plot using 1D array with indices as x positions (y needs to be positive)
+	template <typename T>
+	int bar(size_t height, size_t width, long double xmin, long double xmax, long double ymin, long double ymax, const T &aarray, const options &aoptions = {})
+	{
+		if (!size(aarray))
+			return 1;
+
+		const color_type color = aoptions.color;
+
+		struct winsize w;
+		ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
+		if (!height)
+			height = w.ws_row * 4;
+
+		if (!width)
+			width = w.ws_col * 2;
+
+		if (aoptions.check)
+		{
+			const size_t aheight = height / 4;
+			const size_t awidth = width / 2;
+
+			if (aheight > w.ws_row)
+			{
+				cerr << "The height of the graph (" << aheight << ") is greater then the height of the terminal (" << w.ws_row << ").\n";
+				return 1;
+			}
+
+			if (awidth > w.ws_col)
+			{
+				cerr << "The width of the graph (" << awidth << ") is greater then the width of the terminal (" << w.ws_col << ").\n";
+				return 1;
+			}
+		}
+
+		height *= 2;
+		width /= 2;
+
+		if (!xmin and !xmax)
+		{
+			const auto &[amin, amax] = minmax_element(cbegin(aarray), cend(aarray));
+
+			xmin = *amin;
+			xmax = *amax;
+		}
+
+		if (xmin >= xmax)
+		{
+			cerr << "xmin must be less than xmax.\n";
+			return 1;
+		}
+
+		vector<size_t> bar(width, 0);
+
+		const long double xstep = (xmax - xmin) / width;
+		
+		for (int x = 0; x < size(aarray); x++) {
+			if (x >= xmin and x < xmax)
+			{
+				const size_t index = (x - xmin) / xstep;
+				bar[index] = aarray[x];
+			}
+		}
+
+		if (!ymin and !ymax)
+		{
+			const auto &[amin, amax] = minmax_element(bar.cbegin(), bar.cend());
+
+			ymin = *amin;
+			ymax = *amax;
+		}
+
+		if (ymin >= ymax)
+		{
+			cerr << "ymin must be less than ymax.\n";
+			return 1;
+		}
+
+		const long double ystep = (ymax - ymin) / height;
+		const long double yaxis = ymax / ystep;
+
+		vector<vector<unsigned short>> aaarray(width, vector<unsigned short>(height, 0));
+
+		const unsigned acolor = color + 1;
+
+		for (size_t x = 0; x < size(bar); ++x)
+		{
+			const size_t ay = bar[x];
+
+			for (size_t y = ay >= ymax ? 0 : yaxis - (ay / ystep); y < yaxis and y < height; ++y)
+				aaarray[x][y] = acolor;
+		}
+
+		if (aoptions.type != type_histogram)
+		{
+			options hist_options = aoptions;
+			hist_options.type = type_histogram;
+			return graph(height, width, xmin, xmax, ymin, ymax, aaarray, hist_options);
+		}
+		return graph(height, width, xmin, xmax, ymin, ymax, aaarray, aoptions);
+	}
+
 	template <typename T>
 	int histogram(size_t height, size_t width, long double xmin, long double xmax, long double ymin, long double ymax, const T &aarray, const options &aoptions = {})
 	{
